@@ -2,93 +2,155 @@
 <meta charset="utf-8">
 <style>
 
-body {
-  font: 10px sans-serif;
-}
+    body {
+        font: 16px sans-serif;
+        background-color: #eeeeee;
+    }
 
-.axis path,
-.axis line {
-  fill: none;
-  stroke: #000;
-  shape-rendering: crispEdges;
-}
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }
 
-.x.axis path {
-  display: none;
-}
+    .x.axis path {
+        display: none;
+    }
 
-.line {
-  fill: none;
-  stroke: steelblue;
-  stroke-width: 1.5px;
-}
+    .line {
+        fill: none;
+        stroke: steelblue;
+        stroke-width: 1.5px;
+    }
 
+    .top_container {
+        display: grid;
+        grid-template-columns: 1fr [col-start] 100px [col-start] 1fr;
+        grid-template-rows: repeat(5, 80px [row-start]);
+        grid-column-gap: 8px;
+        grid-row-gap: 8px;
+    }
+
+    .grid_header {
+    {#border: #993300 4px;#}
+    }
+
+    .header_row {
+        align-self: center;
+        justify-self: center;
+        background-color: darkblue;
+        margin: 0px;
+        padding: 0px;
+        color: #eee
+    }
+
+    .item {
+        position: relative;
+        grid-gap: 5px;
+        margin: 0 auto;
+    {#display: grid;#}
+    }
 </style>
+
 <body>
 <script src="http://d3js.org/d3.v3.js"></script>
+
 <script>
 
-var margin = {top: 20, right: 20, bottom: 30, left: 50},
-    width = 960 - margin.left - margin.right,
-    height = 500 - margin.top - margin.bottom;
+    var margin = {top: 20, right: 20, bottom: 30, left: 50},
+        width = 960 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
 
-var parseDate = d3.time.format("%Y-%m-%d").parse; // for dates like "2014-01-01"
-//var parseDate = d3.time.format("%Y-%m-%dT00:00:00Z").parse;  // for dates like "2014-01-01T00:00:00Z"
 
-var x = d3.time.scale()
-    .range([0, width]);
 
-var y = d3.scale.linear()
-    .range([height, 0]);
+    function graph_sparkline(data_list, dom_selector) {
+        var x = d3.scale.linear()
+        .range([0, 14]);
 
-var xAxis = d3.svg.axis()
-    .scale(x)
-    .orient("bottom");
+        var y = d3.scale.linear()
+            .range([100, 0]);
 
-var yAxis = d3.svg.axis()
-    .scale(y)
-    .orient("left");
+        var xAxis = d3.svg.axis().scale(x).orient("bottom");
 
-var line = d3.svg.line()
-    .x(function(d) { return x(d.month); })
-    .y(function(d) { return y(d.count_items); });
+        var yAxis = d3.svg.axis().scale(y).orient("left");
 
-var svg = d3.select("body").append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-  .append("g")
-    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        var svg = d3.select(dom_selector).append("svg").append("g")
 
-d3.json("{% url "mock_data" %}", function(error, data) {
-  data.forEach(function(d) {
-    d.month = parseDate(d.month);
-    d.count_items = +d.count_items;
-  });
+        x.domain(d3.extent(data_list, function (d) {
+            return d.x;
+        }));
+        y.domain(d3.extent(data_list, function (d) {
+            return d.y;
+        }));
 
-  x.domain(d3.extent(data, function(d) { return d.month; }));
-  y.domain(d3.extent(data, function(d) { return d.count_items; }));
 
-  svg.append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + height + ")")
-      .call(xAxis);
+        var line = d3.svg.line()
+        .x(function (d) {
+            return x(d.x);
+        })
+        .y(function (d) {
+            return y(d.y);
+        });
 
-  svg.append("g")
-      .attr("class", "y axis")
-      .call(yAxis)
-    .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", 6)
-      .attr("dy", ".71em")
-      .style("text-anchor", "end")
-      .text("Play count");
+        svg.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis);
 
-  svg.append("path")
-      .datum(data)
-      .attr("class", "line")
-      .attr("d", line);
-});
+        svg.append("g")
+            .attr("class", "y axis")
+            .call(yAxis)
+            .append("text")
+            .attr("y", 6)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("Meeting Hours");
+
+        svg.append("path")
+            .datum(data_list)
+            .attr("class", "line")
+            .attr("d", line);
+    }
+
+    d3.json("{% url "mock_data" %}", function (error, data_obj) {
+        one_timeseries = data_obj.last_3_months.me;
+
+        i = 0;
+        one_timeseries.forEach(function (d) {
+            d.x = i;
+            i = i + 1;
+            d.y = d.meeting_hours;
+        });
+
+        graph_sparkline(one_timeseries, "#cost_chart")
+        graph_sparkline(one_timeseries, "#num_meetings_chart")
+        graph_sparkline(one_timeseries, "#quality_chart")
+        graph_sparkline(one_timeseries, "#per_meeting_cost")
+    });
 
 </script>
+<h2>Laurent's Organizer Report</h2>
+<div class="top_container">
+    <div class="item header_row">Last 7 Days</div>
+    <div class="item header_row">VS. Peers</div>
+    <div class="item header_row">Last 3 Months</div>
+    <div class="item ">First row left</div>
+    <div class="item ">First row center</div>
+    <div class="item " id="cost_chart"></div>
+    <div class="item ">Second row left</div>
+    <div class="item ">Second row center</div>
+    <div class="item  " id="num_meetings_chart"></div>
+    <div class="item ">Third row left</div>
+    <div class="item ">Third row center</div>
+    <div class="item " id="quality_chart"></div>
+    <div class="item ">Fourth row left</div>
+    <div class="item ">Fourth row center</div>
+    <div class="item " id="per_meeting_cost"></div>
+    {#  <div class="item main-left ">Second row left</div>#}
+    {#  <div class="item main-center ">Second row center</div>#}
+</div>
+
+
 </body>
 </html>
