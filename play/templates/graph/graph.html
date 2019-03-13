@@ -14,22 +14,50 @@
         shape-rendering: crispEdges;
     }
 
-    .x.axis path {
-        display: none;
-    }
+    {#.x.axis path {#}
+    {#    display: none;#}
+    {#}#}
 
     .line {
         fill: none;
-        stroke: steelblue;
+        stroke: forestgreen;
+        stroke-width: 1.5px;
+    }
+    .benchmark1_line {
+        fill: none;
+        stroke: darkred;
+        stroke-width: 1.5px;
+    }
+    .benchmark2_line {
+        fill: none;
+        stroke: darkblue;
         stroke-width: 1.5px;
     }
 
+    .left_text {
+        font: 32px sans-serif;
+
+    }
+    .bottom_text {
+        font: 28px sans-serif;
+
+    }
     .top_container {
         display: grid;
-        grid-template-columns: 1fr [col-start] 100px [col-start] 1fr;
-        grid-template-rows: repeat(5, 80px [row-start]);
+        grid-template-columns: 1fr [col-start] 130px [col-start] 2fr;
+        {#grid-template-rows: repeat(5, 150px [row-start]);#}
+        grid-template-rows: 50px 150px 150px 150px 150px;
         grid-column-gap: 8px;
         grid-row-gap: 8px;
+        margin: 10px;
+    }
+    .bottom_container {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 50px 50px 50px 50px;
+        grid-column-gap: 8px;
+        grid-row-gap: 8px;
+        margin: 10px;
     }
 
     .grid_header {
@@ -40,15 +68,17 @@
         align-self: center;
         justify-self: center;
         background-color: darkblue;
-        margin: 0px;
-        padding: 0px;
-        color: #eee
+        color: #eee;
+        width: 100%;
+        height: 100%;
+        font-size: 30px;
+        font-variant: all-small-caps;
     }
 
     .item {
         position: relative;
         grid-gap: 5px;
-        margin: 0 auto;
+        margin: 5px;
     {#display: grid;#}
     }
 </style>
@@ -57,33 +87,46 @@
 <script src="http://d3js.org/d3.v3.js"></script>
 
 <script>
+    var totalWidth = 600;
+    var leftPadding = 40;
+    var rightPadding = 0;
+    var chartWidth = totalWidth - leftPadding - rightPadding;
+    var totalHeight = 150;
+    var bottomPadding = 40;
+    var topPadding = 0;
+    var chartHeight = totalHeight - bottomPadding - topPadding;
 
-    var margin = {top: 20, right: 20, bottom: 30, left: 50},
-        width = 960 - margin.left - margin.right,
-        height = 500 - margin.top - margin.bottom;
 
-
-
-    function graph_sparkline(data_list, dom_selector) {
+    function graph_sparkline(dom_selector, primary_data, benchmark1_data, benchmark2_data) {
         var x = d3.scale.linear()
-        .range([0, 14]);
-
-        var y = d3.scale.linear()
-            .range([100, 0]);
-
-        var xAxis = d3.svg.axis().scale(x).orient("bottom");
-
-        var yAxis = d3.svg.axis().scale(y).orient("left");
-
-        var svg = d3.select(dom_selector).append("svg").append("g")
-
-        x.domain(d3.extent(data_list, function (d) {
+        .range([0, chartWidth]);
+        x.domain(d3.extent(primary_data, function (d) {
             return d.x;
         }));
-        y.domain(d3.extent(data_list, function (d) {
+        var xAxis = d3.svg.axis().scale(x).orient("bottom");
+
+        var y = d3.scale.linear()
+            .range([chartHeight, 0]);
+        y.domain(d3.extent(primary_data, function (d) {
             return d.y;
         }));
+        var yAxis = d3.svg.axis().scale(y).orient("left");
 
+        var svg = d3.select(dom_selector).append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .append("g");
+
+        svg.append("g")
+            .attr("class", "x axis").attr("transform", "translate(" + leftPadding + "," + chartHeight + ")")
+            .call(xAxis);
+
+        svg.append("g").attr("transform", "translate(" + leftPadding + "," + 0 + ")")
+            .attr("class", "y axis")
+            .call(yAxis)
+            .append("text")
+            .style("text-anchor", "end")
+            .text("Meeting Hours");
 
         var line = d3.svg.line()
         .x(function (d) {
@@ -93,41 +136,105 @@
             return y(d.y);
         });
 
-        svg.append("g")
-            .attr("class", "x axis")
-            .attr("transform", "translate(0," + height + ")")
-            .call(xAxis);
-
-        svg.append("g")
-            .attr("class", "y axis")
-            .call(yAxis)
-            .append("text")
-            .attr("y", 6)
-            .attr("dy", ".71em")
-            .style("text-anchor", "end")
-            .text("Meeting Hours");
+        svg.append("path")
+            .datum(primary_data)
+            .attr("class", "line")
+            .attr("transform", "translate(" + leftPadding + "," + 0 + ")")
+            .attr("d", line);
 
         svg.append("path")
-            .datum(data_list)
-            .attr("class", "line")
-            .attr("d", line);
+           .datum(benchmark1_data)
+           .attr("class", "benchmark1_line")
+           .attr("transform", "translate(" + leftPadding + "," + 0 + ")")
+           .attr("d", line);
+
+        svg.append("path")
+           .datum(benchmark2_data)
+           .attr("class", "benchmark2_line")
+           .attr("transform", "translate(" + leftPadding + "," + 0 + ")")
+           .attr("d", line);
     }
 
-    d3.json("{% url "mock_data" %}", function (error, data_obj) {
-        one_timeseries = data_obj.last_3_months.me;
-
+    function extract_timeseries(source_list, data_key) {
+        timeseries = []
         i = 0;
-        one_timeseries.forEach(function (d) {
-            d.x = i;
+        source_list.forEach(function (d) {
+            timeseries.push({x: i, y: d[data_key]});
             i = i + 1;
-            d.y = d.meeting_hours;
         });
+        return timeseries;
+    }
 
-        graph_sparkline(one_timeseries, "#cost_chart")
-        graph_sparkline(one_timeseries, "#num_meetings_chart")
-        graph_sparkline(one_timeseries, "#quality_chart")
-        graph_sparkline(one_timeseries, "#per_meeting_cost")
+    function make_text_from_callout(callout_obj) {
+        return callout_obj.name + (callout_obj.is_recurring ? " (Recurring)": "")
+    }
+
+    function make_data_and_graph(data_obj, data_key, dom_element) {
+        my_data = data_obj.last_3_months.me;
+        peers_data = data_obj.last_3_months.peers_at_title;
+        company_data = data_obj.last_3_months.company;
+        my_timeseries = extract_timeseries(my_data, data_key);
+        peer_benchmark_timeseries = extract_timeseries(peers_data, data_key);
+        company_benchmark_timeseries = extract_timeseries(company_data, data_key);
+
+        graph_sparkline(dom_element, my_timeseries, peer_benchmark_timeseries, company_benchmark_timeseries );
+    }
+    d3.json("{% url "mock_data" %}", function (error, data_obj) {
+        make_data_and_graph(data_obj, "meeting_hours", "#cost_chart");
+        make_data_and_graph(data_obj, "num_total_meetings", "#num_meetings_chart");
+        make_data_and_graph(data_obj, "percent_good_use", "#quality_chart");
+        make_data_and_graph(data_obj, "meeting_hours", "#per_meeting_cost");
+
+
+        hourly_wage = 125;
+
+        hours = data_obj.last_7_summary.me.meeting_hours;
+        dollars = hours * hourly_wage;
+        document.getElementById("company_time_l7d").innerHTML = hours + " hours of company time, totaling approximately $" + dollars;
+
+        peer_hours = data_obj.last_7_summary.peers_at_title.meeting_hours;
+        peer_dollars = peer_hours * hourly_wage;
+        vs_peers = Math.round((hours/peer_hours - 1)*100);
+        document.getElementById("company_time_vs_peers").innerHTML = (vs_peers > 0 ? "+": "") + vs_peers + "%"
+
+
+        meetings = data_obj.last_7_summary.me.num_total_meetings;
+        recurring_meetings = data_obj.last_7_summary.me.num_recurring_meetings;
+        document.getElementById("num_meetings_l7d").innerHTML = meetings + " meetings, " + recurring_meetings + " recurring";
+
+        peer_meetings = data_obj.last_7_summary.peers_at_title.num_total_meetings;
+        vs_peers = Math.round((meetings/peer_meetings - 1)*100);
+        document.getElementById("num_meetings_vs_peers").innerHTML = (vs_peers > 0 ? "+": "") + vs_peers + "%";
+
+        data = Math.round(data_obj.last_7_summary.me.percent_good_use);
+        document.getElementById("good_use_of_time_l7d").innerHTML = "Only " + data + "% of time your attendees thought was a good use of their time";
+
+        peer_data = Math.round(data_obj.last_7_summary.peers_at_title.percent_good_use);
+        vs_peers = Math.round(data-peer_data);
+        document.getElementById("good_use_of_time_vs_peers").innerHTML = (vs_peers > 0 ? "+": "") + vs_peers + "%";
+
+
+        data = Math.round(dollars/meetings);
+        peer_data = Math.round(peer_dollars/peer_meetings);
+        document.getElementById("cost_per_meeting_l7d").innerHTML = "Average cost per meeting: $" + data;
+        vs_peers = Math.round((data/peer_data - 1)*100);
+        document.getElementById("cost_per_meeting_vs_peers").innerHTML = (vs_peers > 0 ? "+": "") + vs_peers + "%";
+
+
+        for (i = 1; i < 4; i++) {
+            ["most_expensive", "least_effective", "most_effective"].forEach(function (d) {
+                elementId = "bottom_r" + i + "_" + d;
+                value_obj = data_obj.last_7_callouts[d][i-1];
+                value_str = make_text_from_callout(value_obj);
+
+                document.getElementById(elementId).innerHTML = value_str;
+            });
+        }
+
+
     });
+
+
 
 </script>
 <h2>Laurent's Organizer Report</h2>
@@ -135,22 +242,35 @@
     <div class="item header_row">Last 7 Days</div>
     <div class="item header_row">VS. Peers</div>
     <div class="item header_row">Last 3 Months</div>
-    <div class="item ">First row left</div>
-    <div class="item ">First row center</div>
+    <div class="item left_text" id="company_time_l7d">First row left</div>
+    <div class="item center_text" id="company_time_vs_peers">First row center</div>
     <div class="item " id="cost_chart"></div>
-    <div class="item ">Second row left</div>
-    <div class="item ">Second row center</div>
+    <div class="item left_text" id="num_meetings_l7d">Second row left</div>
+    <div class="item center_text" id="num_meetings_vs_peers">Second row center</div>
     <div class="item  " id="num_meetings_chart"></div>
-    <div class="item ">Third row left</div>
-    <div class="item ">Third row center</div>
+    <div class="item left_text" id="good_use_of_time_l7d">Third row left</div>
+    <div class="item center_text" id="good_use_of_time_vs_peers">Third row center</div>
     <div class="item " id="quality_chart"></div>
-    <div class="item ">Fourth row left</div>
-    <div class="item ">Fourth row center</div>
+    <div class="item left_text" id="cost_per_meeting_l7d">Fourth row left</div>
+    <div class="item center_text" id="cost_per_meeting_vs_peers">Fourth row center</div>
     <div class="item " id="per_meeting_cost"></div>
-    {#  <div class="item main-left ">Second row left</div>#}
-    {#  <div class="item main-center ">Second row center</div>#}
+
 </div>
 
 
+<div class="bottom_container">
+    <div class="item header_row">Most Effective</div>
+    <div class="item header_row">Most Expensive</div>
+    <div class="item header_row">Least Effective</div>
+    <div class="item bottom_text" id="bottom_r1_most_effective">First row left</div>
+    <div class="item bottom_text" id="bottom_r1_most_expensive">2 row left</div>
+    <div class="item bottom_text" id="bottom_r1_least_effective">3 row left</div>
+    <div class="item bottom_text" id="bottom_r2_most_effective">First row left</div>
+    <div class="item bottom_text" id="bottom_r2_most_expensive">2 row left</div>
+    <div class="item bottom_text" id="bottom_r2_least_effective">3 row left</div>
+    <div class="item bottom_text" id="bottom_r3_most_effective">First row left</div>
+    <div class="item bottom_text" id="bottom_r3_most_expensive">2 row left</div>
+    <div class="item bottom_text" id="bottom_r3_least_effective">3 row left</div>
+</div>
 </body>
 </html>
